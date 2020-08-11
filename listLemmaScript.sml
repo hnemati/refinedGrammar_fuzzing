@@ -72,13 +72,13 @@ SRW_TAC [] []);
 
 val list_r2 = store_thm ("list_r2",
 ``!s1 s2 rhs x.(s1 ++ rhs ++ s2 = [x]) ==> ~(rhs=[]) ==> (s1=[]) /\ (s2=[])``,
-Cases_on `s1` THENL[
+
+Cases_on `s1` THENL[SRW_TAC [] [] THEN metis_tac[APPEND_EQ_SING],
   SRW_TAC [] [] THEN Cases_on `rhs` THEN SRW_TAC [] [] THEN
 `h::t ++ s2 = [h]++(t++s2)` by METIS_TAC [CONS,APPEND,APPEND_11] THEN
 `?s.s++[h]++(t++s2) = [h]++(t++s2)` by FULL_SIMP_TAC (srw_ss()) [] THENL[
   Q.EXISTS_TAC `[]` THEN SRW_TAC [] [],
-  SRW_TAC [] [] THEN `s ++ [h] ++ (t ++ s2) = [x]` by FULL_SIMP_TAC (srw_ss()) [] THEN METIS_TAC [APPEND_eq_NIL,lres]],
-SRW_TAC [] []]);
+  SRW_TAC [] [] THEN `s ++ [h] ++ (t ++ s2) = [x]` by FULL_SIMP_TAC (srw_ss()) [] THEN METIS_TAC [APPEND_eq_NIL,lres]]]);
 
 val list_r6 = store_thm ("list_r6",
 ``!s1 s2 s1' s2' x.(s1' ++ [x] ++ s2' = s1 ++ s2) ==> ?l1 l2.((s1=s1'++[x]++l1) /\ (s2=l2) /\ (s2'=l1++l2)) \/ ((s2=l2++[x]++s2') /\ (s1=l1) /\ (s1'=l1++l2))``,
