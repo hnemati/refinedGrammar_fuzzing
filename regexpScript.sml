@@ -1,7 +1,7 @@
 (* A theory about regular expressions *)
 open HolKernel boolLib bossLib Parse
 open stringTheory listTheory;
-open pred_setTheory listLemmaTheory;
+open pred_setTheory ;
 
 val _ = new_theory "regexp";
 
@@ -56,22 +56,21 @@ SRW_TAC [] [] THEN
 FULL_SIMP_TAC (srw_ss()) [EVERY_MEM]THEN
 Cases_on `n` THENL[
 SRW_TAC [] [isTmnlSym_def, isNonTmnlSym_def],
-FULL_SIMP_TAC (srw_ss()) [rgr_r9eq] THEN
+CCONTR_TAC THEN
 FULL_SIMP_TAC (srw_ss()) [isTmnlSym_def,isNonTmnlSym_def] THEN
-METIS_TAC [isTmnlSym_def,isNonTmnlSym_def,sym_r1b,EQ_IMP_THM]]);
-
+METIS_TAC [MEM_SPLIT_APPEND_last,isTmnlSym_def,isNonTmnlSym_def,sym_r1b,EQ_IMP_THM]]);
 
 val sym_r3b = store_thm ("sym_r3b",
 ``!v.EVERY isNonTmnlSym v ==> ~(?n s1 s2.(v=s1++[n]++s2) /\ isTmnlSym n)``,
 SRW_TAC [] [] THEN
 FULL_SIMP_TAC (srw_ss()) [EVERY_MEM]THEN
 Cases_on `n` THENL[
-FULL_SIMP_TAC (srw_ss()) [rgr_r9eq] THEN
+CCONTR_TAC THEN
 FULL_SIMP_TAC (srw_ss()) [isTmnlSym_def,isNonTmnlSym_def] THEN
-METIS_TAC [isTmnlSym_def,isNonTmnlSym_def,sym_r1b,EQ_IMP_THM],
-SRW_TAC [] [isTmnlSym_def, isNonTmnlSym_def]
-]);
-
+METIS_TAC [MEM_SPLIT_APPEND_last,isTmnlSym_def,isNonTmnlSym_def,sym_r1b,EQ_IMP_THM],
+FULL_SIMP_TAC (srw_ss()) [isTmnlSym_def,isNonTmnlSym_def] THEN
+METIS_TAC [isTmnlSym_def,isNonTmnlSym_def,sym_r1b,EQ_IMP_THM]]
+);
 
 val sym_r4 = store_thm ("sym_r4",
 ``!v.EVERY isTmnlSym v ==> ~(?n. MEM n v /\ ~isTmnlSym n)``,
@@ -97,9 +96,10 @@ FULL_SIMP_TAC (srw_ss()) [EVERY_MEM] THEN
 SRW_TAC [] [] THEN
 Cases_on `e` THENL[
 SRW_TAC [] [isTmnlSym_def, isNonTmnlSym_def],
-SRW_TAC [] [isTmnlSym_def, isNonTmnlSym_def] THEN
-FULL_SIMP_TAC (srw_ss()) [rgr_r9eq] THEN
-METIS_TAC [isNonTmnlSym_def,isTmnlSym_def]]);
+CCONTR_TAC THEN
+FULL_SIMP_TAC (srw_ss()) [isTmnlSym_def,isNonTmnlSym_def] THEN
+METIS_TAC [MEM_SPLIT_APPEND_last,isTmnlSym_def,isNonTmnlSym_def,sym_r1b,EQ_IMP_THM]]
+);
 
 val sym_r6 = store_thm ("sym_r6",
 ``!v.EVERY isTmnlSym v = (~(?n s1 s2.(v=s1++[n]++s2) /\ isNonTmnlSym n))``,
@@ -110,23 +110,20 @@ METIS_TAC [sym_r3], METIS_TAC [sym_r5]
 
 val sym_r7 = store_thm ("sym_r7",
 ``!v.~(EVERY isTmnlSym v) ==> ?n s1 s2.(v=s1++[n]++s2) /\ isNonTmnlSym n``,
+
 SRW_TAC [] [] THEN
-FULL_SIMP_TAC (srw_ss()) [EXISTS_MEM,rgr_r9eq,sym_r1b] THEN
-MAP_EVERY Q.EXISTS_TAC [`e`,`r1`,`r2`] THEN
+FULL_SIMP_TAC (srw_ss()) [EXISTS_MEM,sym_r1b, Once MEM_SPLIT_APPEND_last] THEN
+MAP_EVERY Q.EXISTS_TAC [`e`,`pfx`,`sfx`] THEN
 SRW_TAC [] []
 );
-
 
 val sym_r7b = store_thm ("sym_r7b",
 ``!v.~(EVERY isNonTmnlSym v) ==> ?n s1 s2.(v=s1++[n]++s2) /\ isTmnlSym n``,
 SRW_TAC [] [] THEN
-FULL_SIMP_TAC (srw_ss()) [EXISTS_MEM,rgr_r9eq,sym_r1b] THEN
-MAP_EVERY Q.EXISTS_TAC [`e`,`r1`,`r2`] THEN
+FULL_SIMP_TAC (srw_ss()) [EXISTS_MEM,sym_r1b, Once MEM_SPLIT_APPEND_last] THEN
+MAP_EVERY Q.EXISTS_TAC [`e`,`pfx`,`sfx`] THEN
 METIS_TAC [sym_r1b]
 );
-
-
-
 
 (* Regular Expressions *)
 

@@ -1,5 +1,5 @@
 open stringTheory relationTheory
-open pred_setTheory listLemmaTheory regexpTheory;
+open pred_setTheory regexpTheory;
 use  "grammarDefScript.sml";
     
 (* ----------------------------- *)
@@ -48,7 +48,6 @@ val run_1_step_ns = Q.prove(
   \\ MAP_EVERY Q.EXISTS_TAC [`[]`,`[]`, `u`, `ns`]
   \\full_simp_tac (srw_ss())[rules_def]);
 
-    
 val lemma2gen = store_thm("lemma2gen",
 ``!g s1 s2 s1' s2' s.derives g (s1++s2) s ==> 
      (?s1'. RTC (derives g) s1 s1' /\ (s=s1'++s2)) \/ (?s2'. RTC (derives g) s2 s2' /\ (s=s1++s2'))``,

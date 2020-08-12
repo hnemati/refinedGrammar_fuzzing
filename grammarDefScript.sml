@@ -1,7 +1,7 @@
 (* A theory about regular expressions *)
-open HolKernel boolLib bossLib Parse;
-open stringTheory relationTheory BasicProvers;
-open pred_setTheory listLemmaTheory regexpTheory;
+open HolKernel boolLib bossLib Parse
+open stringTheory relationTheory BasicProvers
+open pred_setTheory  regexpTheory listTheory;
 
 val _ = new_theory "grammarDef";
 
@@ -257,7 +257,7 @@ val upgr_r7 = store_thm("upgr_r7",
 
 val upgr_r11 = store_thm("upgr_r11",
 ``derives g [NTS lhs] [NTS rhs] ==> rule lhs [NTS rhs] IN rules g``,
-       SRW_TAC [] [derives,lreseq]
+       rw [derives, listTheory.MEM_SPLIT_APPEND_last, APPEND_EQ_SING]
 );
 
 val upgr_r15 = store_thm("upgr_r15",
@@ -284,7 +284,15 @@ val upgr_r18 = store_thm("upgr_r18",
 	\\ METIS_TAC []
 );
 
-
+val list_r6 = store_thm ("list_r6",
+``!s1 s2 s1' s2' x.(s1' ++ [x] ++ s2' = s1 ++ s2) ==> ?l1 l2.((s1=s1'++[x]++l1) /\ (s2=l2) /\ (s2'=l1++l2)) \/ ((s2=l2++[x]++s2') /\ (s1=l1) /\ (s1'=l1++l2))``,
+Induct_on `s1'` THENL[
+  SRW_TAC [] [EXISTS_OR_THM] THEN
+  Cases_on `s1` THEN SRW_TAC [] [] THEN
+  FULL_SIMP_TAC (srw_ss()) [],
+  SRW_TAC [] [] THEN Cases_on `s1` THEN FULL_SIMP_TAC (srw_ss()) []
+  THEN FULL_SIMP_TAC (srw_ss()) [EXISTS_OR_THM]
+]);
 val lemma2 = store_thm("lemma2",
 ``!g s1 s2 s1' s2' s.derives g (s1++s2) s ==> (?s1'.derives g s1 s1' /\ (s=s1'++s2)) \/ (?s2'.derives g s2 s2' /\ (s=s1++s2'))``,
        SRW_TAC [] [] 
@@ -335,7 +343,7 @@ val slemma1_4 = store_thm("slemma1_4",
        \\ FULL_SIMP_TAC (srw_ss()) [nonTerminals,rules_def,startSym_def] 
        THENL[Cases_on `x` 
              \\ FULL_SIMP_TAC (srw_ss()) [rule_nonterminals_def,INSERT_DEF] 
-	     \\ METIS_TAC [rules_def,rgr_r9eq],
+	     \\ METIS_TAC [rules_def,MEM_SPLIT_APPEND_last],
              DISJ2_TAC 
              \\ Q.EXISTS_TAC `rule_nonterminals (rule nt rhs)` 
 	     \\ SRW_TAC [] [] 
