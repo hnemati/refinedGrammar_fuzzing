@@ -1031,16 +1031,25 @@ val lang_doesnot_include_x_disj_itsNegation = Q.prove(
 `! s p s1 s2 s3 x.
   let g = G p s in
   ((lang_doesnot_include_x2 s p s1 s2 s3 x) \/ (lang_not_doesnot_include_x2' s p s1 s2 s3 x)) ==>
-     (!w1. RTC (derives (G p s)) s1 w1 ==> containAtLeastOne w1 [TS x] \/ donotContain w1 [TS x])   ==>
-     (!w2. RTC (derives (G p s)) s2 w2 ==> donotContain w2 [TS x])   ==>
-     (!w3. RTC (derives (G p s)) s3 w3 ==> donotContain w3 [TS x])   ==>
+   (((!w1. RTC (derives (G p s)) s1 w1 ==> containAtLeastOne w1 [TS x] \/ donotContain w1 [TS x])   /\
+     (!w2. RTC (derives (G p s)) s2 w2 ==> donotContain w2 [TS x])   /\
+     (!w3. RTC (derives (G p s)) s3 w3 ==> donotContain w3 [TS x]))  \/
+
+    ((!w1. RTC (derives (G p s)) s1 w1 ==> donotContain w1 [TS x])   /\
+     (!w2. RTC (derives (G p s)) s2 w2 ==> containAtLeastOne w2 [TS x] \/ donotContain w2 [TS x])   /\
+     (!w3. RTC (derives (G p s)) s3 w3 ==> donotContain w3 [TS x]))  \/ 
+
+    ((!w1. RTC (derives (G p s)) s1 w1 ==> donotContain w1 [TS x])   /\
+     (!w2. RTC (derives (G p s)) s2 w2 ==> donotContain w2 [TS x])   /\
+     (!w3. RTC (derives (G p s)) s3 w3 ==> containAtLeastOne w3 [TS x] \/ donotContain w3 [TS x]))) ==> 
+
      (!w. (w IN language g) ==> (RTC (derives g) (s1 ++ s3 ++ s2) w)  ==> 
 	  
 	  containAtLeastOne w [TS x] \/ donotContain w [TS x]
      )
 `,
    rw[language_def, startSym_def]
-   \\ EVERY[  assume_tac(
+   \\ assume_tac(
        SPECL [``(s1 :symbol list) ``, ``(s3 :symbol list)``, ``(s2 :symbol list)``,
               ``(G (p :rule -> bool) (s :string) :grammar)``,
 	      ``(((((s1 :symbol list)⧺(s3 :symbol list)):symbol list)⧺(s2 :symbol list)):symbol list)``, ``w:symbol list``]upgr_r119
@@ -1055,9 +1064,19 @@ val lang_doesnot_include_x_disj_itsNegation = Q.prove(
    \\ WEAKEN_TAC is_forall
    \\ rev_full_simp_tac (srw_ss())[containAtLeastOne_def]
 
-   THENL[disj1_tac
+   \\ FIRST_PROVE[disj1_tac
          \\ exists_tac ``(w1:symbol list) ``
 	 \\ exists_tac ``(w2 :symbol list) ⧺ (y' :symbol list) ⧺ (z' :symbol list)``
+	 \\ full_simp_tac (srw_ss())[],
+
+         disj1_tac
+	 \\ exists_tac ``(x' :symbol list) ⧺ (y' :symbol list) ⧺ (w1 :symbol list)``
+         \\ exists_tac ``(w2:symbol list) ``
+	 \\ full_simp_tac (srw_ss())[],
+
+         disj1_tac
+         \\ exists_tac ``(x':symbol list) ++ (w1:symbol list) ``
+	 \\ exists_tac ``(w2 :symbol list) ⧺ (z' :symbol list)``
 	 \\ full_simp_tac (srw_ss())[],
 
         disj2_tac
@@ -1078,8 +1097,9 @@ val lang_doesnot_include_x_disj_itsNegation = Q.prove(
 	\\ qpat_assum `!c. P` (qspecl_then [`TS (x:string)`] ASSUME_TAC)
 	\\ `MEM (TS x) (w:symbol list)` by rev_full_simp_tac (srw_ss ())[]
 	\\ full_simp_tac (srw_ss())[MEM_APPEND]
-	\\ metis_tac[MEM_SPLIT_APPEND_last]]]
+	\\ metis_tac[MEM_SPLIT_APPEND_last]]
 );
+
 
 val containAtLeastOne_impl_neg_donotContain = Q.prove(
 `(! w3 x.
@@ -1160,76 +1180,3 @@ val lang_notAtAll_conj_itsNeg_is_empty = Q.prove(
 (* G & neg(X) == N and G & neg(N) == X, X & neg(X) = empty,  and X | neg(X) == G *)
 
 
-
-val lang_doesnot_include_x_disj_itsNegation = Q.prove(
-`! s p s1 s2 s3 x.
-  let g = G p s in
-  ((lang_doesnot_include_x2 s p s1 s2 s3 x) \/ (lang_not_doesnot_include_x2' s p s1 s2 s3 x)) ==>
-   (((!w1. RTC (derives (G p s)) s1 w1 ==> containAtLeastOne w1 [TS x] \/ donotContain w1 [TS x])   /\
-     (!w2. RTC (derives (G p s)) s2 w2 ==> donotContain w2 [TS x])   /\
-     (!w3. RTC (derives (G p s)) s3 w3 ==> donotContain w3 [TS x]))  \/
-
-    ((!w1. RTC (derives (G p s)) s1 w1 ==> donotContain w1 [TS x])   /\
-     (!w2. RTC (derives (G p s)) s2 w2 ==> containAtLeastOne w2 [TS x] \/ donotContain w2 [TS x])   /\
-     (!w3. RTC (derives (G p s)) s3 w3 ==> donotContain w3 [TS x]))  \/ 
-
-    ((!w1. RTC (derives (G p s)) s1 w1 ==> donotContain w1 [TS x])   /\
-     (!w2. RTC (derives (G p s)) s2 w2 ==> donotContain w2 [TS x])   /\
-     (!w3. RTC (derives (G p s)) s3 w3 ==> containAtLeastOne w3 [TS x] \/ donotContain w3 [TS x]))) ==> 
-
-     (!w. (w IN language g) ==> (RTC (derives g) (s1 ++ s3 ++ s2) w)  ==> 
-	  
-	  containAtLeastOne w [TS x] \/ donotContain w [TS x]
-     )
-`,
-   rw[language_def, startSym_def]
-   \\ assume_tac(
-       SPECL [``(s1 :symbol list) ``, ``(s3 :symbol list)``, ``(s2 :symbol list)``,
-              ``(G (p :rule -> bool) (s :string) :grammar)``,
-	      ``(((((s1 :symbol list)⧺(s3 :symbol list)):symbol list)⧺(s2 :symbol list)):symbol list)``, ``w:symbol list``]upgr_r119
-    )
-   \\ full_simp_tac (srw_ss()) []
-   \\ rev_full_simp_tac (srw_ss()) []
-   \\ qpat_assum `!c. P` (qspecl_then [`y':symbol list`] ASSUME_TAC)
-   \\ WEAKEN_TAC is_forall
-   \\ qpat_assum `!c. P` (qspecl_then [`z':symbol list`] ASSUME_TAC)
-   \\ WEAKEN_TAC is_forall
-   \\ qpat_assum `!c. P` (qspecl_then [`x':symbol list`] ASSUME_TAC)
-   \\ WEAKEN_TAC is_forall
-   \\ rev_full_simp_tac (srw_ss())[containAtLeastOne_def]
-
-   \\ FIRST_PROVE[disj1_tac
-         \\ exists_tac ``(w1:symbol list) ``
-	 \\ exists_tac ``(w2 :symbol list) ⧺ (y' :symbol list) ⧺ (z' :symbol list)``
-	 \\ full_simp_tac (srw_ss())[],
-
-         disj1_tac
-	 \\ exists_tac ``(x' :symbol list) ⧺ (y' :symbol list) ⧺ (w1 :symbol list)``
-         \\ exists_tac ``(w2:symbol list) ``
-	 \\ full_simp_tac (srw_ss())[],
-
-         disj1_tac
-         \\ exists_tac ``(x':symbol list) ++ (w1:symbol list) ``
-	 \\ exists_tac ``(w2 :symbol list) ⧺ (z' :symbol list)``
-	 \\ full_simp_tac (srw_ss())[],
-
-        disj2_tac
-        \\ full_simp_tac (srw_ss()) [donotContain_def]
-	\\ CCONTR_TAC
-	\\ full_simp_tac (arith_ss)[]
-	\\ Q.ABBREV_TAC`w' = w1 ⧺ [TS x] ⧺ w2`
-	\\ imp_res_tac LIST_EQ_REWRITE
-	\\ qpat_assum `!c. P` (qspecl_then [`LENGTH w1`] ASSUME_TAC)
-	\\ SUBGOAL_THEN ``EL (LENGTH (w1:symbol list)) w' = (TS x)`` (fn thm => assume_tac thm)
-	>-  full_simp_tac (srw_ss())[ Abbr`w'`, el_append3]
-        \\ full_simp_tac (srw_ss ())[]
-	\\ SUBGOAL_THEN ``(LENGTH (w1:symbol list)) < (LENGTH (w:symbol list))`` (fn thm => assume_tac thm)
-        >- (`(LENGTH (w1:symbol list)) < (LENGTH (w':symbol list))` by full_simp_tac (list_ss)[Abbr`w'`]
-             \\ full_simp_tac (srw_ss())[])
-        \\ full_simp_tac (srw_ss ())[]
-	\\ imp_res_tac MEM_EL
-	\\ qpat_assum `!c. P` (qspecl_then [`TS (x:string)`] ASSUME_TAC)
-	\\ `MEM (TS x) (w:symbol list)` by rev_full_simp_tac (srw_ss ())[]
-	\\ full_simp_tac (srw_ss())[MEM_APPEND]
-	\\ metis_tac[MEM_SPLIT_APPEND_last]]
-);
