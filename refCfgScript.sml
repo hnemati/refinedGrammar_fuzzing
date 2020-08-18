@@ -36,7 +36,7 @@ val generating_nts_startSym_reachable = new_axiom("generating_nts_startSym_reach
 );
 
 
-val empty_grammar = new_axiom("empty_grammar",
+val null_grammar = new_axiom("null_grammar",
  ``!g s1 s2 s3. (is_null g s1) \/ (is_null g s2) \/ (is_null g s3) ==> is_null g (s1++s2++s3)``
 );
 
@@ -54,7 +54,7 @@ val null_rule = new_axiom("null_rule",
 ``);
 
 (* ----------------------------- *)
-(* Helper theorems               *)
+(* Helper Lemmas                 *)
 (* ----------------------------- *)
 
 val run_1_step = Q.prove(
@@ -111,6 +111,26 @@ val derives_same_append_left_rtc = store_thm ("derives_same_append_left_rtc",
   \\ METIS_TAC [relationTheory.RTC_RULES,derives_same_append_left]
 );
 
+val trans_derive_thm = Q.prove(
+`!s p s1 s2 s3 x . 
+   (RTC(derives (G p s)) [NTS s] (s1++s2++s3))  ==> 
+   (RTC(derives (G p s)) s2 x) ==>
+   (RTC(derives (G p s)) [NTS s] (s1++x++s3)) `,
+
+     rw[]
+  \\ assume_tac(SPECL [``(G (p :rule -> bool) (s :string) :grammar)``, 
+		  ``(s2 :symbol list)``, ``(x :symbol list)``] derives_same_append_right_rtc)
+  \\ rev_full_simp_tac (arith_ss) []
+  \\ qpat_assum `!c. P` (qspecl_then [`(s3 :symbol list)`] ASSUME_TAC)
+  \\ assume_tac( SPECL [``(G (p :rule -> bool) (s :string) :grammar)``, 
+       ``(s2 :symbol list) ++ (s3 :symbol list)``,
+       ``(x :symbol list) ++ (s3 :symbol list)``] derives_same_append_left_rtc
+       )
+   \\ rev_full_simp_tac (arith_ss) []
+   \\ qpat_assum `!c. P` (qspecl_then [`(s1 :symbol list)`] ASSUME_TAC)
+   \\ metis_tac[APPEND,APPEND_ASSOC,RTC_CASES_RTC_TWICE]
+);
+
 val left_move_rtc = Q.prove(
 `! g s1 x p s w.
  let l = rule s (s1 ++ x) in
@@ -160,7 +180,6 @@ val derives_append_gen = Q.prove(
   \\ HO_MATCH_MP_TAC RTC_INDUCT THEN SRW_TAC [][] 
      THENL [METIS_TAC [rtc_derives_same_append_left], METIS_TAC [derives_same_append_right,RTC_RULES]]);
   
-
 val id_rtc = Q.prove(
 `!x g. (RTC(derives g) x x)`,  SRW_TAC[] [derives, RTC_REFL]
 );
@@ -241,7 +260,15 @@ val neg_rtc_neg_single_step = Q.prove (
   \\ full_simp_tac (srw_ss()) []
 );
 
-val upgr_r119 = Q.prove(`!x y z g u v.RTC (derives g) u v ==> (u=x++y++z) ==> (?x' y' z'. ((v=x'++y'++z') /\ RTC (derives g) x x' /\ RTC (derives g) y y' /\ RTC (derives g) z z'))`,
+val split_derive_rel = Q.prove(
+`!x y z g u v.
+   RTC (derives g) u v ==>
+   (u=x++y++z) ==> 
+   (?x' y' z'. ((v=x'++y'++z') /\
+          RTC (derives g) x x' /\ 
+	  RTC (derives g) y y' /\
+          RTC (derives g) z z')
+   )`,
 
   ntac 4 GEN_TAC 
   \\ HO_MATCH_MP_TAC RTC_INDUCT_RIGHT1 
@@ -267,26 +294,6 @@ val onlyOne_impl_atLeastOne_thm = Q.prove(
    rw[containAtLeastOne_def, containOnlyone_def]
 );
 
-val trans_derive_thm = Q.prove(
-`!s p s1 s2 s3 x . 
-   (RTC(derives (G p s)) [NTS s] (s1++s2++s3))  ==> 
-   (RTC(derives (G p s)) s2 x) ==>
-   (RTC(derives (G p s)) [NTS s] (s1++x++s3)) `,
-
-     rw[]
-  \\ assume_tac(SPECL [``(G (p :rule -> bool) (s :string) :grammar)``, 
-		  ``(s2 :symbol list)``, ``(x :symbol list)``] derives_same_append_right_rtc)
-  \\ rev_full_simp_tac (arith_ss) []
-  \\ qpat_assum `!c. P` (qspecl_then [`(s3 :symbol list)`] ASSUME_TAC)
-  \\ assume_tac( SPECL [``(G (p :rule -> bool) (s :string) :grammar)``, 
-       ``(s2 :symbol list) ++ (s3 :symbol list)``,
-       ``(x :symbol list) ++ (s3 :symbol list)``] derives_same_append_left_rtc
-       )
-   \\ rev_full_simp_tac (arith_ss) []
-   \\ qpat_assum `!c. P` (qspecl_then [`(s1 :symbol list)`] ASSUME_TAC)
-   \\ metis_tac[APPEND,APPEND_ASSOC,RTC_CASES_RTC_TWICE]
-);
-
 val donotContain_fromNotDerivable_thm = Q.prove(
  `! s x y g.
    ((derives g)^* s y) /\ (¬(derives g)^* s [TS x]) /\ (EVERY isTmnlSym [TS (x:string)]) ==>
@@ -296,16 +303,6 @@ val donotContain_fromNotDerivable_thm = Q.prove(
   \\ CCONTR_TAC
   \\ full_simp_tac (srw_ss()) []
   \\ metis_tac [RTC_CASES_RTC_TWICE]
-);
-
-val neq_fromNotDerivable_thm = Q.prove(
-` !x y g. (EVERY isTmnlSym x) /\ (EVERY isTmnlSym y) /\  (¬(derives g)^* x y) ==>
-    ~(x = y)`,
-  rw []
-  \\ imp_res_tac neg_rtc_neg_single_step
-  \\ full_simp_tac (srw_ss()) [derives]
-  \\ CCONTR_TAC
-  \\ full_simp_tac (srw_ss()) []
 );
 
 val neg_donotContain_impl_onlyOneOrAtLeastOne = Q.prove(
@@ -353,64 +350,24 @@ val containAtLeastOne_impl_neg_donotContain = Q.prove(
    \\ metis_tac[containAtLeastOne_def, donotContain_def]
 );
 
-(* ----------------------------- *)
-(* Basic case                    *)
-(* ----------------------------- *)
+(* ---------------------------------------------------------- *)
+(* Basic case                                                 *)
+(* ---------------------------------------------------------- *)
 
-(* ----------------------------- *)
-(*         At least one          *)
-(* ----------------------------- *)
+(* ---------------------------------------------------------- *)
+(* Grammar contaning at-least-one fault                       *)
+(* ---------------------------------------------------------- *)
 
-val lang_includes_atLeatOne_x_ns = Q.prove(
-` ! g s1 x s2 w ns.
- let l = rule ns (s1 ++ [TS x] ++ s2) in
-     (g = (G p s)) ==>      
-     (l IN rules (G p s)) ==> 
-     (derives g [NTS (startSym g)] [NTS ns]) ==>
-     (? w1 w2. (RTC (derives (G p s)) s1 w1) ==> 
-       (RTC (derives (G p s)) s2 w2) ==>
-       (w = w1 ++ [TS x] ++ w2)  ==>
-       (EVERY isTmnlSym w1) ==>
-       (EVERY isTmnlSym w2) ==>
-       (w IN language g)
-    )
-`,
-  srw_tac [][rules_def, language_def, startSym_def]
-  \\ exists_tac ``(w1 :symbol list)``
-  \\ exists_tac ``(w2 :symbol list)``
-  \\ rw [isTmnlSym_def]
-  \\ UNABBREV_ALL_TAC
-  \\ assume_tac(
-       SPECL [``s:string``, ``(p :rule -> bool)``, ``(((((s1 :symbol list) ⧺ [TS (x :string)]) :symbol list) ⧺
-              (s2 :symbol list)) :symbol list)``, ``ns:string``] run_1_step_ns
-     )
-  \\ rev_full_simp_tac(srw_ss())[]
-  \\ assume_tac(SPECL [``(G (p :rule -> bool) (s :string) :grammar)``, ``[NTS (s:string)]``,  ``[NTS (ns:string)]``] res2)
-  \\ rev_full_simp_tac (srw_ss())[]
-  \\ qpat_assum `!c. P` (qspecl_then [`(((((s1 :symbol list) ⧺ [TS (x :string)]) :symbol list) ⧺
-             (s2 :symbol list))
-              :symbol list)`] ASSUME_TAC)
-  \\ assume_tac(
-      SPECL[``[TS (x:string)]``, ``s1:symbol list``, ``s2:symbol list``,
-	    ``p:rule -> bool``, ``s:string``,``w1:symbol list``,``w2:symbol list``, ``ns:string``] 
-	   (SIMP_RULE (srw_ss())[LET_DEF] append_same_mid_rtc2)
-  )
-  \\ rev_full_simp_tac (arith_ss)[rules_def]
-  \\ assume_tac(SPECL [``(G (p :rule -> bool) (s :string) :grammar)``, ``[NTS (s:string)]``,  ``[NTS (ns:string)]``] res3)
-  \\ TAKE_DOWN_TAC ``derives (G p s) [NTS s] [NTS ns]``
-  \\ full_simp_tac (arith_ss) []
-);
-
-val lang_includes_atLeatOne_x2_def = Define`
-  lang_includes_atLeatOne_x2 s p s1 s2 s3 x = 
+val lang_includes_atLeatOne_x_def = Define`
+  lang_includes_atLeatOne_x s p s1 s2 s3 x = 
   let g = (G p s)  in
  
      (RTC (derives g) [NTS s] (s1 ++ s3 ++ s2)) ==>  
      (!w. (w IN language g) ==> (RTC (derives g) (s1 ++ s3 ++ s2) w) ==> 
 	  (? w1 w2 w3. 
-	     (RTC (derives (G p s)) s1 w1) ==> 
-	     (RTC (derives (G p s)) s2 w2) ==>	
-	     (RTC (derives (G p s)) s3 w3 /\ (containAtLeastOne w3 [TS x])) ==>     
+	     (RTC (derives g) s1 w1) ==> 
+	     (RTC (derives g) s2 w2) ==>	
+	     (RTC (derives g) s3 w3 /\ (containAtLeastOne w3 [TS x])) ==>     
 	     (EVERY isTmnlSym w1) ==>
 	     (EVERY isTmnlSym w2) ==>
 	     (EVERY isTmnlSym w3) ==>
@@ -421,13 +378,13 @@ val lang_includes_atLeatOne_x2_def = Define`
 
 val lang_includes_atLeatOne_x_lem = Q.prove(
 `!s p s1 s2 s3 x. 
-     lang_includes_atLeatOne_x2 s p s1 s2 s3 x`,
+     lang_includes_atLeatOne_x s p s1 s2 s3 x`,
  
-     srw_tac [][lang_includes_atLeatOne_x2_def, rules_def, language_def, derives]
+     srw_tac [][lang_includes_atLeatOne_x_def, rules_def, language_def, derives]
      \\ assume_tac(
            SPECL [``(s1 :symbol list) ``, ``(s3 :symbol list)``, ``(s2 :symbol list)``,
 		  ``(g :grammar)``,
-		  ``(((((s1 :symbol list) ⧺ (s3 :symbol list)) :symbol list) ⧺ (s2 :symbol list)) :symbol list)``, ``w:symbol list``]upgr_r119
+		  ``(((((s1 :symbol list) ⧺ (s3 :symbol list)) :symbol list) ⧺ (s2 :symbol list)) :symbol list)``, ``w:symbol list``] split_derive_rel
 )
      \\ full_simp_tac (srw_ss()) []
      \\ rev_full_simp_tac (srw_ss()) []
@@ -439,8 +396,8 @@ val lang_includes_atLeatOne_x_lem = Q.prove(
      \\ full_simp_tac (srw_ss()) [startSym_def]
 );
 
-val lang_includes_atLeatOne_x3_def = Define`
-  lang_includes_atLeatOne_x3 s p s1 s2 s3 x = 
+val lang_includes_atLeatOne_x'_def = Define`
+  lang_includes_atLeatOne_x' s p s1 s2 s3 x = 
   let g = (G p s)  in
  
      (RTC (derives g) [NTS s] (s1 ++ s3 ++ s2)) ==>  
@@ -452,13 +409,13 @@ val lang_includes_atLeatOne_x3_def = Define`
 
 val lang_includes_atLeatOne_x'_lem = Q.prove(
 `!s p s1 s2 s3 x. 
-     lang_includes_atLeatOne_x3 s p s1 s2 s3 x`,
+     lang_includes_atLeatOne_x' s p s1 s2 s3 x`,
  
-     srw_tac [][lang_includes_atLeatOne_x3_def, rules_def, language_def, derives]
+     srw_tac [][lang_includes_atLeatOne_x'_def, rules_def, language_def, derives]
      \\ assume_tac(
            SPECL [``(s1 :symbol list) ``, ``(s3 :symbol list)``, ``(s2 :symbol list)``,
 		  ``(g :grammar)``,
-		  ``(((((s1 :symbol list) ⧺ (s3 :symbol list)) :symbol list) ⧺ (s2 :symbol list)) :symbol list)``, ``w:symbol list``]upgr_r119
+		  ``(((((s1 :symbol list) ⧺ (s3 :symbol list)) :symbol list) ⧺ (s2 :symbol list)) :symbol list)``, ``w:symbol list``] split_derive_rel
 )
      \\ full_simp_tac (srw_ss()) []
      \\ rev_full_simp_tac (srw_ss()) []
@@ -475,8 +432,8 @@ val lang_includes_atLeatOne_x'_lem = Q.prove(
 (*         None at all           *)
 (* ----------------------------- *)
 
-val lang_doesnot_include_x_def = Define`
-  lang_doesnot_include_x s p s1 s2 x =  
+val lang_doesnot_include_x'_def = Define`
+  lang_doesnot_include_x' s p s1 s2 x =  
   let g = (G p s)  in
  
      ~(RTC (derives g) [NTS s] (s1 ++ [TS x] ++ s2)) ==>  
@@ -490,11 +447,11 @@ val lang_doesnot_include_x_def = Define`
      )
 `;
 
-val lang_doesnot_include_x_lem = Q.prove(
+val lang_doesnot_include_x'_lem = Q.prove(
 `!s p s1 s2 x. 
-     lang_doesnot_include_x s p s1 s2 x`,
+     lang_doesnot_include_x' s p s1 s2 x`,
  
-   srw_tac [][lang_doesnot_include_x_def, rules_def, language_def, derives,startSym_def,isTmnlSym_def, LET_DEF]
+   srw_tac [][lang_doesnot_include_x'_def, rules_def, language_def, derives,startSym_def,isTmnlSym_def, LET_DEF]
   \\ CCONTR_TAC
   \\ full_simp_tac (arith_ss)[]
   \\ assume_tac(
@@ -517,8 +474,9 @@ val lang_doesnot_include_x_lem = Q.prove(
   \\ metis_tac[isTmnlSym_def, EVERY_APPEND, EVERY_DEF]
 );
 
-val lang_doesnot_include_x2_def = Define`
-  lang_doesnot_include_x2 s p s1 s2 s3 x =  
+
+val lang_doesnot_include_x_def = Define`
+  lang_doesnot_include_x s p s1 s2 s3 x =  
   let g = (G p s)  in
  
      (RTC (derives g) [NTS s] (s1 ++ s3 ++ s2)) ==>
@@ -532,9 +490,9 @@ val lang_doesnot_include_x2_def = Define`
 
 val lang_doesnot_include_x'_lem = Q.prove(
 `!s p s1 s2 s3 x. 
-     lang_doesnot_include_x2 s p s1 s2 s3 x`,
+     lang_doesnot_include_x s p s1 s2 s3 x`,
  
-   srw_tac [][lang_doesnot_include_x2_def,language_def, derives,startSym_def, LET_DEF, donotContain_def]
+   srw_tac [][lang_doesnot_include_x_def,language_def, derives,startSym_def, LET_DEF, donotContain_def]
   \\ CCONTR_TAC
   \\ full_simp_tac (arith_ss)[]
   \\ Q.ABBREV_TAC`w' = w1 ⧺ [TS x] ⧺ w2`
@@ -554,7 +512,7 @@ val lang_doesnot_include_x'_lem = Q.prove(
             SPECL [``s1:symbol list``, ``s3:symbol list``, ``s2:symbol list``,
 		   ``(G (p :rule -> bool) (s :string) :grammar)``,
 		   ``(((((s1 :symbol list) ⧺ (s3 :symbol list)) :symbol list) ⧺ (s2 :symbol list)) :symbol list)``,
-		   ``(w :symbol list)``] upgr_r119
+		   ``(w :symbol list)``] split_derive_rel
 	)
   \\ `w' = w` by full_simp_tac (srw_ss())[]
   \\ full_simp_tac (srw_ss ())[]
@@ -569,9 +527,9 @@ val lang_doesnot_include_x'_lem = Q.prove(
   \\ metis_tac[MEM_SPLIT_APPEND_last]
 );
 
-(* ----------------------------- *)
-(*          Only one             *)
-(* ----------------------------- *)
+(* ---------------------------------------------------------- *)
+(*  Grammar contains exactly-one                              *)
+(* ---------------------------------------------------------- *)
 
 val lang_includes_onlyOne_x_def = Define`
   lang_includes_onlyOne_x s p s1 s2 s3 x = 
@@ -618,7 +576,7 @@ val lang_includes_onlyOne_x_lem = Q.prove(
             SPECL [``s1:symbol list``, ``s3:symbol list``, ``s2:symbol list``,
 		   ``(G (p :rule -> bool) (s :string) :grammar)``,
 		   ``(((((s1 :symbol list) ⧺ (s3 :symbol list)) :symbol list) ⧺ (s2 :symbol list)) :symbol list)``,
-		   ``(w :symbol list)``] upgr_r119
+		   ``(w :symbol list)``] split_derive_rel
 	)
   \\ `w' = w` by full_simp_tac (srw_ss())[]
   \\ full_simp_tac (srw_ss ())[]
@@ -633,18 +591,18 @@ val lang_includes_onlyOne_x_lem = Q.prove(
   \\ metis_tac[MEM_SPLIT_APPEND_last]
 );
 
-(* ----------------------------- *)
-(*         Combination           *)
-(* ----------------------------- *)
+(* ---------------------------------------------------------- *)
+(* Combination                                                *)
+(* ---------------------------------------------------------- *)
 
-(* ----------------------------- *)
-(* At least one Conj Exactly one *)
-(* ----------------------------- *)
+(* ---------------------------------------------------------- *)
+(* at-least-one Conj exactly-one                              *)
+(* ---------------------------------------------------------- *)
 
 val atLeastOne_conj_onlyOne = Q.prove(
 `! s p s1 s2 s3 x.
   let g = G p s in
-  ((lang_includes_onlyOne_x s p s1 s2 s3 x) /\ (lang_includes_atLeatOne_x2 s p s1 s2 s3 x)) ==>
+  ((lang_includes_onlyOne_x s p s1 s2 s3 x) /\ (lang_includes_atLeatOne_x s p s1 s2 s3 x)) ==>
       (!w.
 	  (w IN language g) ==> (RTC(derives g) (s1 ++ s3 ++ s2) w) ==>   
               
@@ -656,7 +614,7 @@ val atLeastOne_conj_onlyOne = Q.prove(
 	    )
       )
 `,
-  rw[lang_includes_atLeatOne_x2_def]
+  rw[lang_includes_atLeatOne_x_def]
   \\ full_simp_tac (srw_ss()) [language_def, startSym_def, isTmnlSym_def]
 
   \\ assume_tac(
@@ -674,28 +632,28 @@ val atLeastOne_conj_onlyOne = Q.prove(
   \\ metis_tac [onlyOne_impl_atLeastOne_thm]
 );
 
-(* ----------------------------- *)
-(* At least one disj Exactly one *)
-(* ----------------------------- *)
+(* ---------------------------------------------------------- *)
+(* at-least-one disj exactly-one                              *)
+(* ---------------------------------------------------------- *)
 
 val atLeastOne_disj_onlyOne = Q.prove(
 `! s p s1 s2 s3 x.
   let g = G p s in
-  ((lang_includes_onlyOne_x s p s1 s2 s3 x) \/ (lang_includes_atLeatOne_x3 s p s1 s2 s3 x)) ==>
+  ((lang_includes_onlyOne_x s p s1 s2 s3 x) \/ (lang_includes_atLeatOne_x' s p s1 s2 s3 x)) ==>
      (!w3. (RTC (derives g) (s3) w3) ==> containAtLeastOne w3 [TS x]) ==>
      (!w. (w IN language g) ==> (RTC (derives g) (s1 ++ s3 ++ s2) w)  ==> 
 	  
 	  containAtLeastOne w [TS x]
      )
 `,
-    rw[lang_includes_atLeatOne_x3_def, lang_includes_onlyOne_x_def, containAtLeastOne_def, language_def]
+    rw[lang_includes_atLeatOne_x'_def, lang_includes_onlyOne_x_def, containAtLeastOne_def, language_def]
     THENL[  assume_tac(
              SPECL [``s:string``, ``p:rule -> bool``,
 		    ``(((((s1 :symbol list) ⧺ (s3 :symbol list)) :symbol list)⧺(s2 :symbol list)) :symbol list)``,
 		    ``w:symbol list``]  generating_nts_startSym_reachable)
        \\ rev_full_simp_tac (srw_ss())[language_def, LET_DEF]
        \\ full_simp_tac (srw_ss())[]
-       \\ imp_res_tac (SIMP_RULE (srw_ss()) [lang_includes_atLeatOne_x3_def, LET_DEF]lang_includes_atLeatOne_x'_lem)
+       \\ imp_res_tac (SIMP_RULE (srw_ss())[lang_includes_atLeatOne_x'_def, LET_DEF]lang_includes_atLeatOne_x'_lem)
        \\ qpat_assum `!c. P` (qspecl_then [`x:string`] ASSUME_TAC)
        \\ WEAKEN_TAC is_forall
        \\ rev_full_simp_tac (srw_ss()) [containAtLeastOne_def]
@@ -717,14 +675,14 @@ val atLeastOne_disj_onlyOne = Q.prove(
 val atLeastOne_disj_onlyOne' = Q.prove(
 `! s p s1 s2 s3 x.
   let g = G p s in
-  ((lang_includes_onlyOne_x s p s1 s2 s3 x) \/ (lang_includes_atLeatOne_x3 s p s1 s2 s3 x)) ==>
+  ((lang_includes_onlyOne_x s p s1 s2 s3 x) \/ (lang_includes_atLeatOne_x' s p s1 s2 s3 x)) ==>
      (!w3. (derives g)^* s3 w3 ⇒ (~ donotContain w3 [TS x]))          ==>
      (!w. (w IN language g) ==> (RTC (derives g) (s1 ++ s3 ++ s2) w)  ==> 
 	  
 	  containAtLeastOne w [TS x]
      )
 `,
-    rw[lang_includes_atLeatOne_x3_def, lang_includes_onlyOne_x_def, containAtLeastOne_def, language_def]
+    rw[lang_includes_atLeatOne_x'_def, lang_includes_onlyOne_x_def, containAtLeastOne_def, language_def]
     THENL[assume_tac(
              SPECL [``s:string``, ``p:rule -> bool``,
 		    ``(((((s1 :symbol list) ⧺ (s3 :symbol list)) :symbol list)⧺(s2 :symbol list)) :symbol list)``,
@@ -735,11 +693,11 @@ val atLeastOne_disj_onlyOne' = Q.prove(
             SPECL [``s1:symbol list``, ``s3:symbol list``, ``s2:symbol list``,
 		   ``(G (p :rule -> bool) (s :string) :grammar)``,
 		   ``(((((s1 :symbol list) ⧺ (s3 :symbol list)) :symbol list) ⧺ (s2 :symbol list)) :symbol list)``,
-		   ``(w :symbol list)``] upgr_r119
+		   ``(w :symbol list)``] split_derive_rel
 	)
        \\ assume_tac (SPECL [``[TS (x:string)]``, ``s3:symbol list``]neg_donotContain_impl_AtLeastOne)
        \\ rev_full_simp_tac (arith_ss) []
-       \\ imp_res_tac (SIMP_RULE (srw_ss()) [lang_includes_atLeatOne_x3_def, LET_DEF]lang_includes_atLeatOne_x'_lem)
+       \\ imp_res_tac (SIMP_RULE (srw_ss()) [lang_includes_atLeatOne_x'_def,LET_DEF]lang_includes_atLeatOne_x'_lem)
        \\ qpat_assum `!c. P` (qspecl_then [`w:symbol list`] ASSUME_TAC)
        \\ WEAKEN_TAC is_forall
        \\ rev_full_simp_tac (srw_ss()) [language_def, startSym_def, containAtLeastOne_def]
@@ -755,28 +713,28 @@ val atLeastOne_disj_onlyOne' = Q.prove(
        \\ rev_full_simp_tac (arith_ss) [containAtLeastOne_def]]
 );
 
-(* ----------------------------- *)
-(* At least one disj none at all *)
-(* ----------------------------- *)
+(* ---------------------------------------------------------- *)
+(* at-least-one disj none-at-all                              *)
+(* ---------------------------------------------------------- *)
 
 val atLeastOne_disj_none = Q.prove(
 `! s p s1 s2 s3 x.
   let g = G p s in
-  ((lang_doesnot_include_x2 s p s1 s2 s3 x) \/ (lang_includes_atLeatOne_x3 s p s1 s2 s3 x)) ==>
+  ((lang_doesnot_include_x s p s1 s2 s3 x) \/ (lang_includes_atLeatOne_x' s p s1 s2 s3 x)) ==>
      (∀w3. (derives g)^* s3 w3 ==>   containAtLeastOne w3 [TS x])     ==>
      (!w. (w IN language g) ==> (RTC (derives g) (s1 ++ s3 ++ s2) w)  ==> 
 	  
 	  containAtLeastOne w [TS x]
      )
 `,
-    rw[lang_includes_atLeatOne_x3_def, lang_doesnot_include_x2_def, containAtLeastOne_def, language_def]
+    rw[lang_includes_atLeatOne_x'_def, lang_doesnot_include_x_def, containAtLeastOne_def, language_def]
     THENL[  assume_tac(
              SPECL [``s:string``, ``p:rule -> bool``,
 		    ``(((((s1 :symbol list) ⧺ (s3 :symbol list)) :symbol list)⧺(s2 :symbol list)) :symbol list)``,
 		    ``w:symbol list``]  generating_nts_startSym_reachable)
        \\ rev_full_simp_tac (srw_ss())[language_def, LET_DEF]
        \\ full_simp_tac (srw_ss())[]
-       \\ imp_res_tac (SIMP_RULE (srw_ss()) [lang_includes_atLeatOne_x3_def, LET_DEF]lang_includes_atLeatOne_x'_lem)
+       \\ imp_res_tac (SIMP_RULE (srw_ss())[lang_includes_atLeatOne_x'_def, LET_DEF]lang_includes_atLeatOne_x'_lem)
        \\ qpat_assum `!c. P` (qspecl_then [`x:string`] ASSUME_TAC)
        \\ WEAKEN_TAC is_forall
        \\ rev_full_simp_tac (srw_ss()) [containAtLeastOne_def]
@@ -795,54 +753,12 @@ val atLeastOne_disj_none = Q.prove(
        \\ full_simp_tac  (srw_ss()) []]
 );
 
-val atLeastOne_disj2_none = Q.prove(
-`! s p s1 s2 s3 x.
-  let g = G p s in
-  ((lang_doesnot_include_x2 s p s1 s2 s3 x) \/ (lang_includes_atLeatOne_x3 s p s1 s2 s3 x)) ==>
-     (!w3. (derives g)^* s3 w3 ⇒ (~ donotContain w3 [TS x]))          ==>
-     (!w. (w IN language g) ==> (RTC (derives g) (s1 ++ s3 ++ s2) w)  ==> 
-	  
-	  containAtLeastOne w [TS x]
-     )
-`,
-    rw[lang_includes_atLeatOne_x3_def, lang_doesnot_include_x2_def, containAtLeastOne_def, language_def]
-      THENL[assume_tac(
-             SPECL [``s:string``, ``p:rule -> bool``,
-		    ``(((((s1 :symbol list) ⧺ (s3 :symbol list)) :symbol list)⧺(s2 :symbol list)) :symbol list)``,
-		    ``w:symbol list``]  generating_nts_startSym_reachable)
-       \\ rev_full_simp_tac (srw_ss())[language_def, LET_DEF]
-       \\ full_simp_tac (srw_ss())[]
-       \\ assume_tac(
-            SPECL [``s1:symbol list``, ``s3:symbol list``, ``s2:symbol list``,
-		   ``(G (p :rule -> bool) (s :string) :grammar)``,
-		   ``(((((s1 :symbol list) ⧺ (s3 :symbol list)) :symbol list) ⧺ (s2 :symbol list)) :symbol list)``,
-		   ``(w :symbol list)``] upgr_r119
-	)
-       \\ assume_tac (SPECL [``[TS (x:string)]``, ``s3:symbol list``]neg_donotContain_impl_AtLeastOne)
-       \\ rev_full_simp_tac (arith_ss) []
-       \\ imp_res_tac (SIMP_RULE (srw_ss()) [lang_includes_atLeatOne_x3_def, LET_DEF]lang_includes_atLeatOne_x'_lem)
-       \\ qpat_assum `!c. P` (qspecl_then [`w:symbol list`] ASSUME_TAC)
-       \\ WEAKEN_TAC is_forall
-       \\ rev_full_simp_tac (srw_ss()) [language_def, startSym_def, containAtLeastOne_def]
-       \\ full_simp_tac (srw_ss()) [], 
+(* ---------------------------------------------------------- *)
+(* negation of exactly one                                    *)
+(* ---------------------------------------------------------- *)
 
-         assume_tac(
-             SPECL [``s:string``, ``p:rule -> bool``,
-		    ``(((((s1 :symbol list) ⧺ (s3 :symbol list)) :symbol list)⧺(s2 :symbol list)) :symbol list)``,
-		    ``w:symbol list``]  generating_nts_startSym_reachable)
-       \\ rev_full_simp_tac (srw_ss())[language_def, LET_DEF]
-       \\ full_simp_tac  (srw_ss()) []
-       \\ assume_tac (SPECL [``[TS (x:string)]``, ``s3:symbol list``]neg_donotContain_impl_AtLeastOne)
-       \\ rev_full_simp_tac (arith_ss) [containAtLeastOne_def]]
-
-);
-
-(* ----------------------------- *)
-(*         not exactly one       *)
-(* ----------------------------- *)
-
-val lang_not_includes_onlyOne_x_def = Define`
-  lang_not_includes_onlyOne_x s p s1 s2 s3 x = 
+val lang_neg_includes_onlyOne_x_def = Define`
+  lang_neg_includes_onlyOne_x s p s1 s2 s3 x = 
    let g = (G p s)      in  
         (
 	     (RTC (derives g) [NTS s] (s1 ++ s3 ++ s2))                        ==> 
@@ -880,9 +796,9 @@ val lang_not_includes_onlyOne_x_def = Define`
 val NIL_APPEND = Q.prove(`!l. [] ++ l = l`, full_simp_tac(srw_ss()) []);
 
 val lang_not_includes_onlyOne_x = Q.prove(
-`! s p s1 s2 s3 x. lang_not_includes_onlyOne_x s p s1 s2 s3 x`,
+`! s p s1 s2 s3 x. lang_neg_includes_onlyOne_x s p s1 s2 s3 x`,
 
-   rw[lang_not_includes_onlyOne_x_def]
+   rw[lang_neg_includes_onlyOne_x_def]
    THENL[MAP_EVERY Q.EXISTS_TAC [`[]:symbol list`,`[]:symbol list`, `s3':symbol list`] 
          \\ full_simp_tac (srw_ss()) [],
 
@@ -945,28 +861,36 @@ val lang_not_includes_onlyOne_x = Q.prove(
 );
 
 
-(* ----------------------------- *)
-(*        neg none at all        *)
-(* ----------------------------- *)
+(* ---------------------------------------------------------- *)
+(* Negation of hte none-at-all                                *)
+(* ---------------------------------------------------------- *)
 
-val lang_not_doesnot_include_x2_def = Define`
-  lang_not_doesnot_include_x2 s p s1 s2 s3 x =  
+val lang_not_doesnot_include_x_def = Define`
+  lang_not_doesnot_include_x s p s1 s2 s3 x =  
   let g = (G p s)  in
  
      (RTC (derives g) [NTS s] (s1 ++ s3 ++ s2)) ==>
      (
-      (~(!w1. RTC (derives (G p s)) s1 w1 ==> EVERY isTmnlSym w1 ==> donotContain w1 [TS x]) /\
-      (!w2. RTC (derives (G p s)) s2 w2 ==> EVERY isTmnlSym w2 ==> donotContain w2 [TS x])   /\
-      (!w3. RTC (derives (G p s)) s3 w3 ==> EVERY isTmnlSym w3 ==> donotContain w3 [TS x]))  \/
+      (~(!w1. RTC (derives g) s1 w1 ==> EVERY isTmnlSym w1 ==> donotContain w1 [TS x])  /\
+      (!w2. RTC (derives g) s2 w2   ==> EVERY isTmnlSym w2 ==> donotContain w2 [TS x])  /\
+      (!w3. RTC (derives g) s3 w3   ==> EVERY isTmnlSym w3 ==> donotContain w3 [TS x])) \/
 
-     ((!w1. RTC (derives (G p s)) s1 w1 ==> EVERY isTmnlSym w1 ==> donotContain w1 [TS x])   /\
-      ~(!w2. RTC (derives (G p s)) s2 w2 ==> EVERY isTmnlSym w2 ==> donotContain w2 [TS x])  /\
-      (!w3. RTC (derives (G p s)) s3 w3 ==> EVERY isTmnlSym w3 ==> donotContain w3 [TS x]))  \/
+     ((!w1. RTC (derives g) s1 w1   ==> EVERY isTmnlSym w1 ==> donotContain w1 [TS x])  /\
+      ~(!w2. RTC (derives g) s2 w2  ==> EVERY isTmnlSym w2 ==> donotContain w2 [TS x])  /\
+      (!w3. RTC (derives g) s3 w3   ==> EVERY isTmnlSym w3 ==> donotContain w3 [TS x])) \/
 
-     ((!w1. RTC (derives (G p s)) s1 w1 ==> EVERY isTmnlSym w1 ==> donotContain w1 [TS x])   /\
-      (!w2. RTC (derives (G p s)) s2 w2 ==> EVERY isTmnlSym w2 ==> donotContain w2 [TS x])   /\
-      ~(!w3. RTC (derives (G p s)) s3 w3 ==> EVERY isTmnlSym w3 ==> donotContain w3 [TS x]))
-     )==>
+     ((!w1. RTC (derives g) s1 w1   ==> EVERY isTmnlSym w1 ==> donotContain w1 [TS x])  /\
+      (!w2. RTC (derives g) s2 w2   ==> EVERY isTmnlSym w2 ==> donotContain w2 [TS x])  /\
+      ~(!w3. RTC (derives g) s3 w3  ==> EVERY isTmnlSym w3 ==> donotContain w3 [TS x]))
+     ) 
+`;
+
+val lang_not_doesnot_include_x_lem = Q.prove(
+  `! s p s1 s2 s3 x. 
+     let g = (G p s)  in
+     lang_not_doesnot_include_x s p s1 s2 s3 x ==>
+     (RTC (derives (G p s)) [NTS s] (s1 ++ s3 ++ s2)) ==>
+
      (!w. (w IN language g) ==>
 	  (?w1 w2 w3.
 	    (RTC(derives g) s1 w1) ==>
@@ -975,12 +899,10 @@ val lang_not_doesnot_include_x2_def = Define`
 	    (w = w1 ++ w3 ++ w2)   ==>
 	     ~(donotContain w [TS x])
 	  )
-     )
-`;
-
-val neg_noneAtAll = Q.prove(
-  `! s p s1 s2 s3 x. lang_not_doesnot_include_x2 s p s1 s2 s3 x`,
-   rw[lang_not_doesnot_include_x2_def, language_def, LET_DEF, startSym_def]
+     )`,
+  
+   rw[lang_not_doesnot_include_x_def, language_def, LET_DEF, startSym_def]
+   \\ full_simp_tac (srw_ss())[]
    THENL[MAP_EVERY Q.EXISTS_TAC [`w1:symbol list`,`[]:symbol list`, `[]:symbol list`] 
          \\ full_simp_tac (srw_ss()) [],
          MAP_EVERY Q.EXISTS_TAC [`[]:symbol list`,`w2:symbol list`, `[]:symbol list`] 
@@ -989,14 +911,14 @@ val neg_noneAtAll = Q.prove(
          \\ full_simp_tac (srw_ss()) []]
 );
 
-val lang_not_doesnot_include_x2'_def = Define`
+(* val lang_not_doesnot_include_x2'_def = Define`
   lang_not_doesnot_include_x2' s p s1 s2 s3 x =  
   let g = (G p s)  in
  
      (RTC (derives g) [NTS s] (s1 ++ s3 ++ s2)) ==>
-     (!w1. RTC (derives (G p s)) s1 w1 ==> containAtLeastOne w1 [TS x])   ==>
-     (!w2. RTC (derives (G p s)) s2 w2 ==> donotContain w2 [TS x])   ==>
-     (!w3. RTC (derives (G p s)) s3 w3 ==> donotContain w3 [TS x])   ==>
+     (!w1. RTC (derives g) s1 w1 ==> containAtLeastOne w1 [TS x])   ==>
+     (!w2. RTC (derives g) s2 w2 ==> donotContain w2 [TS x])   ==>
+     (!w3. RTC (derives g) s3 w3 ==> donotContain w3 [TS x])   ==>
      (!w. (w IN language g) ==> (RTC (derives g) (s1 ++ s3 ++ s2) w) ==>  
 	  ~(donotContain w [TS x])
      )
@@ -1008,7 +930,7 @@ val neg_noneAtAll' = Q.prove(
    \\ assume_tac(
        SPECL [``(s1 :symbol list) ``, ``(s3 :symbol list)``, ``(s2 :symbol list)``,
               ``(G (p :rule -> bool) (s :string) :grammar)``,
-	      ``(((((s1 :symbol list)⧺(s3 :symbol list)):symbol list)⧺(s2 :symbol list)):symbol list)``, ``w:symbol list``]upgr_r119
+	      ``(((((s1 :symbol list)⧺(s3 :symbol list)):symbol list)⧺(s2 :symbol list)):symbol list)``, ``w:symbol list``] split_derive_rel
    )
    \\ full_simp_tac (srw_ss()) []
    \\ rev_full_simp_tac (srw_ss()) []
@@ -1023,36 +945,39 @@ val neg_noneAtAll' = Q.prove(
    \\ exists_tac ``(w2 :symbol list) ⧺ (y' :symbol list) ⧺ (z' :symbol list)``
    \\ full_simp_tac (srw_ss())[]
  
-);
-
+);*)
 (* ----------------------------- *)
 
-val lang_doesnot_include_x_disj_itsNegation = Q.prove(
+val lang_doesnot_include_x_disj_itsNegation_def = Define`
+    lang_doesnot_include_x_disj_itsNegation s p s1 s2 s3 x =
+       let g = G p s in
+
+       (((!w1. RTC (derives g) s1 w1 ==> containAtLeastOne w1 [TS x] \/ donotContain w1 [TS x]) /\
+        (!w2. RTC (derives g) s2 w2 ==> donotContain w2 [TS x])      /\
+        (!w3. RTC (derives g) s3 w3 ==> donotContain w3 [TS x]))     \/
+
+        ((!w1. RTC (derives g) s1 w1 ==> donotContain w1 [TS x])     /\
+        (!w2. RTC (derives g) s2 w2 ==> containAtLeastOne w2 [TS x]  \/ donotContain w2 [TS x]) /\
+        (!w3. RTC (derives g) s3 w3 ==> donotContain w3 [TS x]))     \/ 
+
+        ((!w1. RTC (derives g) s1 w1 ==> donotContain w1 [TS x])     /\
+        (!w2. RTC (derives g) s2 w2 ==> donotContain w2 [TS x])      /\
+        (!w3. RTC (derives g) s3 w3 ==> containAtLeastOne w3 [TS x]  \/ donotContain w3 [TS x]))) 
+`;
+
+val lang_doesnot_include_x_disj_itsNegation_lem = Q.prove(
 `! s p s1 s2 s3 x.
   let g = G p s in
-  ((lang_doesnot_include_x2 s p s1 s2 s3 x) \/ (lang_not_doesnot_include_x2' s p s1 s2 s3 x)) ==>
-   (((!w1. RTC (derives (G p s)) s1 w1 ==> containAtLeastOne w1 [TS x] \/ donotContain w1 [TS x])   /\
-     (!w2. RTC (derives (G p s)) s2 w2 ==> donotContain w2 [TS x])   /\
-     (!w3. RTC (derives (G p s)) s3 w3 ==> donotContain w3 [TS x]))  \/
-
-    ((!w1. RTC (derives (G p s)) s1 w1 ==> donotContain w1 [TS x])   /\
-     (!w2. RTC (derives (G p s)) s2 w2 ==> containAtLeastOne w2 [TS x] \/ donotContain w2 [TS x])   /\
-     (!w3. RTC (derives (G p s)) s3 w3 ==> donotContain w3 [TS x]))  \/ 
-
-    ((!w1. RTC (derives (G p s)) s1 w1 ==> donotContain w1 [TS x])   /\
-     (!w2. RTC (derives (G p s)) s2 w2 ==> donotContain w2 [TS x])   /\
-     (!w3. RTC (derives (G p s)) s3 w3 ==> containAtLeastOne w3 [TS x] \/ donotContain w3 [TS x]))) ==> 
-
-     (!w. (w IN language g) ==> (RTC (derives g) (s1 ++ s3 ++ s2) w)  ==> 
-	  
-	  containAtLeastOne w [TS x] \/ donotContain w [TS x]
-     )
+    lang_doesnot_include_x_disj_itsNegation s p s1 s2 s3 x ==>
+    (!w. (w IN language g) ==> (RTC (derives g) (s1 ++ s3 ++ s2) w)  ==> 
+	 containAtLeastOne w [TS x] \/ donotContain w [TS x]
+    )
 `,
-   rw[language_def, startSym_def]
+   rw[language_def, startSym_def, lang_doesnot_include_x_disj_itsNegation_def]
    \\ assume_tac(
        SPECL [``(s1 :symbol list) ``, ``(s3 :symbol list)``, ``(s2 :symbol list)``,
               ``(G (p :rule -> bool) (s :string) :grammar)``,
-	      ``(((((s1 :symbol list)⧺(s3 :symbol list)):symbol list)⧺(s2 :symbol list)):symbol list)``, ``w:symbol list``]upgr_r119
+	      ``(((((s1 :symbol list)⧺(s3 :symbol list)):symbol list)⧺(s2 :symbol list)):symbol list)``, ``w:symbol list``] split_derive_rel
     )
    \\ full_simp_tac (srw_ss()) []
    \\ rev_full_simp_tac (srw_ss()) []
@@ -1100,6 +1025,7 @@ val lang_doesnot_include_x_disj_itsNegation = Q.prove(
 	\\ metis_tac[MEM_SPLIT_APPEND_last]]
 );
 
+(* ----------------------------- *)
 
 val containAtLeastOne_impl_neg_donotContain = Q.prove(
 `(! w3 x.
@@ -1111,47 +1037,45 @@ val containAtLeastOne_impl_neg_donotContain = Q.prove(
 );
 
 
-val lang_notAtAll_conj_itsNeg_def = Define`
-  lang_notAtAll_conj_itsNeg s p s1 s2 s3 x =  
-  let g = (G p s)  in
+val lang_doesnot_include_x_conj_itsNegation_def = Define`
+    lang_doesnot_include_x_conj_itsNegation s p s1 s2 s3 x =  
+       let g = (G p s)  in
  
-     (RTC (derives g) [NTS s] (s1 ++ s3 ++ s2)) ==>
-     (
-      ((?w1. RTC (derives (G p s)) s1 w1 ==> EVERY isTmnlSym w1 ==>
-               (donotContain w1 [TS x] /\  containAtLeastOne w1 [TS x])) /\
-      (!w2. RTC (derives (G p s)) s2 w2 ==> EVERY isTmnlSym w2 ==> donotContain w2 [TS x])   /\
-      (!w3. RTC (derives (G p s)) s3 w3 ==> EVERY isTmnlSym w3 ==> donotContain w3 [TS x]))  \/
+       (RTC (derives g) [NTS s] (s1 ++ s3 ++ s2)) ==>
+       (
+        ((?w1. RTC (derives g) s1 w1 ==> EVERY isTmnlSym w1 ==>
+                (donotContain w1 [TS x] /\  containAtLeastOne w1 [TS x])) /\
+        (!w2. RTC (derives g) s2 w2 ==> EVERY isTmnlSym w2 ==> donotContain w2 [TS x])    /\
+        (!w3. RTC (derives g) s3 w3 ==> EVERY isTmnlSym w3 ==> donotContain w3 [TS x]))   \/
 
-     ((!w1. RTC (derives (G p s)) s1 w1 ==> EVERY isTmnlSym w1 ==> donotContain w1 [TS x])   /\
-      (?w2. RTC (derives (G p s)) s2 w2 ==> EVERY isTmnlSym w2 ==>
-              (donotContain w2 [TS x] /\  containAtLeastOne w2 [TS x]))  /\
-      (!w3. RTC (derives (G p s)) s3 w3 ==> EVERY isTmnlSym w3 ==> donotContain w3 [TS x]))  \/
+        ((!w1. RTC (derives g) s1 w1 ==> EVERY isTmnlSym w1 ==> donotContain w1 [TS x])   /\
+        (?w2.  RTC (derives g) s2 w2 ==> EVERY isTmnlSym w2 ==>
+                (donotContain w2 [TS x] /\  containAtLeastOne w2 [TS x])) /\
+        (!w3. RTC (derives g) s3 w3 ==> EVERY isTmnlSym w3 ==> donotContain w3 [TS x]))   \/
 
-     ((!w1. RTC (derives (G p s)) s1 w1 ==> EVERY isTmnlSym w1 ==> donotContain w1 [TS x])   /\
-      (!w2. RTC (derives (G p s)) s2 w2 ==> EVERY isTmnlSym w2 ==> donotContain w2 [TS x])   /\
-      (?w3. RTC (derives (G p s)) s3 w3 ==> EVERY isTmnlSym w3 ==>
+        ((!w1. RTC (derives g) s1 w1 ==> EVERY isTmnlSym w1 ==> donotContain w1 [TS x])   /\
+        (!w2.  RTC (derives g) s2 w2 ==> EVERY isTmnlSym w2 ==> donotContain w2 [TS x])   /\
+        (?w3.  RTC (derives g) s3 w3 ==> EVERY isTmnlSym w3 ==>
               (donotContain w3 [TS x] /\  containAtLeastOne w3 [TS x])))
      )
     
 `;
 
-val lang_notAtAll_conj_itsNeg_is_empty = Q.prove(
+val lang_doesnot_include_x_conj_itsNegation_lem = Q.prove(
 `!s p s1 s2 s3 x.
-   lang_notAtAll_conj_itsNeg s p s1 s2 s3 x ==>
+   lang_doesnot_include_x_conj_itsNegation s p s1 s2 s3 x ==>
    (RTC (derives (G p s)) [NTS s] (s1 ++ s3 ++ s2)) ==>
    is_null (G p s) (s1++s3++s2)`,
 
-   rw[lang_notAtAll_conj_itsNeg_def, language_def, LET_DEF, startSym_def, is_null]
+   rw[lang_doesnot_include_x_conj_itsNegation_def, language_def, LET_DEF, startSym_def, is_null]
    \\ full_simp_tac (srw_ss()) []
    THENL[assume_tac(
         SPECL [``s:string``, ``(p :rule -> bool)``, ``s1:symbol list``,
                ``donotContain``, ``containAtLeastOne``] null_rule 
        )
    \\ qpat_assum `!c. P` (qspecl_then [`w1:symbol list`, `[TS (x:string)]`] ASSUME_TAC)
-   \\ res_tac
    \\ assume_tac(SPECL [``w1:symbol list``, ``x:string``] containAtLeastOne_impl_neg_donotContain)
-   \\ res_tac
-   \\ metis_tac [empty_grammar, is_null],
+   \\ metis_tac [null_grammar, is_null],
 
 
     assume_tac(
@@ -1159,10 +1083,8 @@ val lang_notAtAll_conj_itsNeg_is_empty = Q.prove(
                ``donotContain``, ``containAtLeastOne``] null_rule 
        )
    \\ qpat_assum `!c. P` (qspecl_then [`w2:symbol list`, `[TS (x:string)]`] ASSUME_TAC)
-   \\ res_tac
    \\ assume_tac(SPECL [``w2:symbol list``, ``x:string``] containAtLeastOne_impl_neg_donotContain)
-   \\ res_tac
-   \\ metis_tac [empty_grammar, is_null],
+   \\ metis_tac [null_grammar, is_null],
 
 
      assume_tac(
@@ -1170,13 +1092,9 @@ val lang_notAtAll_conj_itsNeg_is_empty = Q.prove(
                ``donotContain``, ``containAtLeastOne``] null_rule 
        )
    \\ qpat_assum `!c. P` (qspecl_then [`w3:symbol list`, `[TS (x:string)]`] ASSUME_TAC)
-   \\ res_tac
    \\ assume_tac(SPECL [``w3:symbol list``, ``x:string``] containAtLeastOne_impl_neg_donotContain)
-   \\ res_tac
-   \\ metis_tac [empty_grammar, is_null]]
+   \\ metis_tac [null_grammar, is_null]]
 );
 
 
 (* G & neg(X) == N and G & neg(N) == X, X & neg(X) = empty,  and X | neg(X) == G *)
-
-
