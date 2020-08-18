@@ -66,7 +66,7 @@ val allSyms = Define `allSyms g = nonTerminals g UNION terminals g`
 val _ = overload_on ("set", ``LIST_TO_SET``);
 
 
-val derives = Define `
+val derives_def = Define `
   derives g lsl rsl = ?s1 s2 rhs lhs. (s1 ++ [NTS lhs] ++ s2 = lsl) /\ 
                                       (s1 ++ rhs ++ s2 = rsl) /\ 
                                       (rule lhs rhs IN rules g)`;
@@ -94,12 +94,12 @@ CFG G' = (V', T, P', S) such that foreach A in V' there is some w in T* for whic
 
 val derives_same_append_left = store_thm ("derives_same_append_left",
 	``!g u v.derives g u v ==> !x.derives g (x++u) (x++v)``,
-	SRW_TAC [] [derives] THEN MAP_EVERY Q.EXISTS_TAC [`x++s1`,`s2`,`rhs`,`lhs`]
+	SRW_TAC [] [derives_def] THEN MAP_EVERY Q.EXISTS_TAC [`x++s1`,`s2`,`rhs`,`lhs`]
 	\\ SRW_TAC [] []);
 
 val derives_same_append_right = store_thm ("derives_same_append_right",
 	``!g u v.derives g u v ==> !x.derives g (u++x) (v++x)``,
-	SRW_TAC [] [derives] 
+	SRW_TAC [] [derives_def] 
         \\ MAP_EVERY Q.EXISTS_TAC [`s1`,`s2++x`,`rhs`,`lhs`]
 	\\ SRW_TAC [] []);
 
@@ -133,7 +133,7 @@ val derives_append = store_thm ("derives_append",
 
 val res1 = store_thm ("res1",
 	``!lhs rhs g.rule lhs rhs IN rules g ==> derives g [NTS lhs] rhs``,
-	SRW_TAC [] [derives] 
+	SRW_TAC [] [derives_def] 
         \\ MAP_EVERY Q.EXISTS_TAC [`[]`,`[]`,`rhs`,`lhs`]
 	\\ SRW_TAC [] []);
 
@@ -180,7 +180,7 @@ there exists a and b in (V'UT')* for which S=>*aXb.
 *)
 
 
-val is_null = Define `is_null g r = !w.RTC (derives g) r w ==> is_word w ==> (w=[]) `;
+val is_null_def = Define `is_null g r = !w.RTC (derives g) r w ==> is_word w ==> (w=[]) `;
 
 (*
 Theorem 4.3
@@ -223,7 +223,7 @@ val sub_result = store_thm ("sub_result",
 
 val key_result = store_thm ("key_result",
   ``EVERY (gaw g) v /\ derives g u v ==> EVERY (gaw g) u``,
-       SRW_TAC [][derives]  
+       SRW_TAC [][derives_def]  
        \\ FULL_SIMP_TAC (srw_ss()) [listTheory.EVERY_APPEND] 
        \\ `EVERY (gaw g) rhs ==> 
                ?w. RTC (derives g) rhs w /\ EVERY isTmnlSym w` by FULL_SIMP_TAC (srw_ss()) [gaw,sub_result]
@@ -251,13 +251,13 @@ val upgr_r7 = store_thm("upgr_r7",
        HO_MATCH_MP_TAC RTC_STRONG_INDUCT_RIGHT1  
        \\ SRW_TAC [] []
        THENL[MAP_EVERY Q.EXISTS_TAC [`x`,`y`] THEN SRW_TAC [] [RTC_RULES,RTC_REFLEXIVE],
-             FULL_SIMP_TAC (srw_ss()) [derives]  
+             FULL_SIMP_TAC (srw_ss()) [derives_def]  
             \\ METIS_TAC []]
 );
 
 val upgr_r11 = store_thm("upgr_r11",
 ``derives g [NTS lhs] [NTS rhs] ==> rule lhs [NTS rhs] IN rules g``,
-       rw [derives, listTheory.MEM_SPLIT_APPEND_last, APPEND_EQ_SING]
+       rw [derives_def, listTheory.MEM_SPLIT_APPEND_last, APPEND_EQ_SING]
 );
 
 val upgr_r15 = store_thm("upgr_r15",
@@ -278,7 +278,7 @@ val rtc_r1 = store_thm("rtc_r1",
 val upgr_r18 = store_thm("upgr_r18",
 ``derives g s s' ==> (?pfx sfx.(s'=pfx++sfx) /\ derives g s pfx)``,
         SRW_TAC [] [] 
-        \\ FULL_SIMP_TAC (srw_ss()) [derives] 
+        \\ FULL_SIMP_TAC (srw_ss()) [derives_def] 
 	\\ MAP_EVERY Q.EXISTS_TAC [`s1++rhs++s2`,`[]`] 
 	\\ SRW_TAC [] [] 
 	\\ METIS_TAC []
@@ -296,11 +296,11 @@ Induct_on `s1'` THENL[
 val lemma2 = store_thm("lemma2",
 ``!g s1 s2 s1' s2' s.derives g (s1++s2) s ==> (?s1'.derives g s1 s1' /\ (s=s1'++s2)) \/ (?s2'.derives g s2 s2' /\ (s=s1++s2'))``,
        SRW_TAC [] [] 
-       \\ RULE_ASSUM_TAC (REWRITE_RULE [derives])  
+       \\ RULE_ASSUM_TAC (REWRITE_RULE [derives_def])  
        \\ FULL_SIMP_TAC (srw_ss()) [] 
        \\ `?l1 l2.((s1=s1'++[NTS lhs]++l1) /\ (s2=l2) /\ (s2'=l1++l2)) \/ ((s2=l2++[NTS lhs]++s2') /\ (s1=l1) /\ (s1'=l1++l2))` by METIS_TAC [list_r6] 
-       THENL[DISJ1_TAC THEN SRW_TAC [] [derives] >> METIS_TAC [],
-	     DISJ2_TAC THEN SRW_TAC [] [derives] >> METIS_TAC [listTheory.APPEND_ASSOC]]
+       THENL[DISJ1_TAC THEN SRW_TAC [] [derives_def] >> METIS_TAC [],
+	     DISJ2_TAC THEN SRW_TAC [] [derives_def] >> METIS_TAC [listTheory.APPEND_ASSOC]]
 );
 
 
